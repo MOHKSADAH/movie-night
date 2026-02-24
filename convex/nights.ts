@@ -141,3 +141,50 @@ export const joinNight = mutation({
     }
   },
 });
+
+export const getCalendarNights = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const nights = await ctx.db.query("movie_nights").order("desc").collect();
+
+    return await Promise.all(
+      nights.map(async (night) => {
+        let pickedMovieData: {
+          title: string;
+          poster: string;
+          imdbRating?: number;
+        } | null = null;
+        let avgRating: number | null = null;
+
+        if (night.pickedMovie) {
+          const movie = await ctx.db.get(night.pickedMovie);
+          if (movie) {
+            pickedMovieData = {
+              title: movie.title,
+              poster: movie.poster,
+              imdbRating: movie.imdbRating,
+            };
+          }
+
+          const watchedEntry = await ctx.db
+            .query("watched_entries")
+            .withIndex("by_night", (q) => q.eq("nightId", night._id))
+            .first();
+
+          if (watchedEntry && watchedEntry.ratings.length > 0) {
+            const total = watchedEntry.ratings.reduce(
+              (sum, r) => sum + r.score,
+              0,
+            );
+            avgRating = total / watchedEntry.ratings.length;
+          }
+        }
+
+        return { ...night, pickedMovieData, avgRating };
+      }),
+    );
+  },
+});

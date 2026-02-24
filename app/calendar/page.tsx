@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, createContext, useContext } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { AppShell } from "@/components/app-shell";
@@ -17,9 +17,93 @@ import {
 } from "@/components/ui/dialog";
 import { CalendarDays, Plus, Film, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { toast } from "sonner";
-import { DayPicker } from "react-day-picker";
+import { DayPicker, type DayButtonProps } from "react-day-picker";
 import "react-day-picker/style.css";
+import { cn } from "@/lib/utils";
+
+type CalendarNight = {
+  _id: string;
+  title: string;
+  date: number;
+  status: "upcoming" | "active" | "done";
+  attendees: string[];
+  candidates: string[];
+  pickedMovieData: {
+    title: string;
+    poster: string;
+    imdbRating?: number;
+  } | null;
+  avgRating: number | null;
+};
+
+// Context to share nightDates map with the custom DayButton (avoids component-in-render)
+const NightDatesCtx = createContext<Record<string, CalendarNight[]>>({});
+
+function CalendarDayButton({ day, modifiers, ...props }: DayButtonProps) {
+  const nightDates = useContext(NightDatesCtx);
+  const night = nightDates[day.date.toDateString()]?.[0];
+
+  const base = "h-14 w-14 p-0 rounded-md transition-colors";
+
+  if (night?.pickedMovieData) {
+    return (
+      <button
+        {...props}
+        className={cn(base, "relative overflow-hidden border border-primary/30")}
+      >
+        <Image
+          src={night.pickedMovieData.poster}
+          alt={night.pickedMovieData.title}
+          fill
+          className="object-cover opacity-55"
+          sizes="56px"
+        />
+        <span className="absolute top-0.5 left-1 text-[10px] font-bold text-white drop-shadow z-10">
+          {day.date.getDate()}
+        </span>
+        {night.avgRating != null && (
+          <span className="absolute bottom-0.5 right-0.5 text-[8px] font-semibold bg-black/60 text-white px-0.5 rounded z-10 leading-tight">
+            {night.avgRating.toFixed(1)}
+          </span>
+        )}
+      </button>
+    );
+  }
+
+  if (night) {
+    return (
+      <button
+        {...props}
+        className={cn(
+          base,
+          "relative flex flex-col items-center justify-center hover:bg-accent",
+          modifiers.today && "bg-accent font-semibold",
+          modifiers.outside && "opacity-40",
+        )}
+      >
+        <span className="text-sm">{day.date.getDate()}</span>
+        <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+      </button>
+    );
+  }
+
+  return (
+    <button
+      {...props}
+      className={cn(
+        base,
+        "flex items-center justify-center hover:bg-accent",
+        modifiers.today && "bg-accent font-semibold",
+        modifiers.selected &&
+          "bg-primary text-primary-foreground hover:bg-primary",
+        modifiers.outside && "opacity-40",
+        modifiers.disabled && "opacity-30 cursor-not-allowed",
+      )}
+    />
+  );
+}
 
 function CreateNightDialog({
   open,
@@ -76,30 +160,6 @@ function CreateNightDialog({
                 selected={date}
                 onSelect={setDate}
                 disabled={{ before: new Date() }}
-                classNames={{
-                  months: "flex flex-col sm:flex-row",
-                  month: "space-y-2",
-                  caption: "flex justify-center pt-1 relative items-center",
-                  caption_label: "text-sm font-medium",
-                  nav: "space-x-1 flex items-center",
-                  nav_button:
-                    "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 border border-border rounded-md flex items-center justify-center",
-                  nav_button_previous: "absolute left-1",
-                  nav_button_next: "absolute right-1",
-                  table: "w-full border-collapse",
-                  head_row: "flex",
-                  head_cell:
-                    "text-muted-foreground rounded-md w-8 font-normal text-[0.8rem]",
-                  row: "flex w-full mt-1",
-                  cell: "text-center text-sm p-0 relative",
-                  day: "h-8 w-8 p-0 font-normal rounded-md hover:bg-accent hover:text-accent-foreground",
-                  day_selected:
-                    "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
-                  day_today: "border border-border",
-                  day_disabled:
-                    "text-muted-foreground opacity-30 cursor-not-allowed",
-                  day_outside: "text-muted-foreground opacity-30",
-                }}
               />
             </div>
           </div>
@@ -131,202 +191,223 @@ export default function CalendarPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
 
-  const nights = useQuery(api.nights.getNights);
+  const nights = useQuery(api.nights.getCalendarNights);
 
-  // Build a set of dates that have movie nights
-  const nightDates = nights?.reduce(
-    (acc, night) => {
-      const d = new Date(night.date);
-      const key = d.toDateString();
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(night);
-      return acc;
-    },
-    {} as Record<string, typeof nights>,
-  );
-
-  const modifiers = {
-    hasNight: (date: Date) => !!nightDates?.[date.toDateString()],
-  };
+  const nightDates =
+    nights?.reduce(
+      (acc, night) => {
+        const key = new Date(night.date).toDateString();
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(night as CalendarNight);
+        return acc;
+      },
+      {} as Record<string, CalendarNight[]>,
+    ) ?? {};
 
   const upcomingNights = nights?.filter((n) => n.status !== "done");
   const pastNights = nights?.filter((n) => n.status === "done");
 
   return (
     <AppShell>
-      <div className="p-6 max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Calendar</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Schedule and manage movie nights
-            </p>
-          </div>
-          <Button onClick={() => setCreateOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            New Night
-          </Button>
-        </div>
-
-        <div className="grid md:grid-cols-[auto_1fr] gap-6">
-          {/* Calendar */}
-          <Card className="self-start">
-            <CardContent className="p-4">
-              <DayPicker
-                month={selectedMonth}
-                onMonthChange={setSelectedMonth}
-                modifiers={modifiers}
-                modifiersClassNames={{
-                  hasNight: "border-2 border-primary font-bold",
-                }}
-                classNames={{
-                  months: "flex flex-col",
-                  month: "space-y-3",
-                  caption:
-                    "flex justify-center pt-1 relative items-center pb-2",
-                  caption_label: "text-sm font-semibold",
-                  nav: "space-x-1 flex items-center",
-                  nav_button:
-                    "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 border border-border rounded-md flex items-center justify-center",
-                  nav_button_previous: "absolute left-1",
-                  nav_button_next: "absolute right-1",
-                  table: "w-full border-collapse",
-                  head_row: "flex",
-                  head_cell:
-                    "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
-                  row: "flex w-full mt-1",
-                  cell: "text-center text-sm p-0 relative",
-                  day: "h-9 w-9 p-0 font-normal rounded-md hover:bg-accent hover:text-accent-foreground transition-colors",
-                  day_today:
-                    "bg-accent text-accent-foreground font-semibold",
-                  day_outside: "text-muted-foreground opacity-40",
-                }}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Nights list */}
-          <div className="space-y-6">
-            {/* Upcoming */}
+      <NightDatesCtx.Provider value={nightDates}>
+        <div className="p-6 max-w-4xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
             <div>
-              <h2 className="font-semibold mb-3">Upcoming Nights</h2>
-              <div className="space-y-2">
-                {nights === undefined ? (
-                  [...Array(3)].map((_, i) => (
-                    <Skeleton key={i} className="h-20 rounded-lg" />
-                  ))
-                ) : upcomingNights && upcomingNights.length > 0 ? (
-                  upcomingNights
-                    .sort((a, b) => a.date - b.date)
-                    .map((night) => {
-                      const config = STATUS_CONFIG[night.status];
-                      return (
+              <h1 className="text-2xl font-bold tracking-tight">Calendar</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Schedule and manage movie nights
+              </p>
+            </div>
+            <Button onClick={() => setCreateOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              New Night
+            </Button>
+          </div>
+
+          <div className="grid md:grid-cols-[auto_1fr] gap-6">
+            {/* Calendar */}
+            <Card className="self-start">
+              <CardContent className="p-4">
+                <DayPicker
+                  month={selectedMonth}
+                  onMonthChange={setSelectedMonth}
+                  components={{ DayButton: CalendarDayButton }}
+                  classNames={{
+                    weekday:
+                      "w-14 text-center text-xs text-muted-foreground font-normal pb-1",
+                    day: "w-14 h-14",
+                  }}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Nights list */}
+            <div className="space-y-6">
+              {/* Upcoming */}
+              <div>
+                <h2 className="font-semibold mb-3">Upcoming Nights</h2>
+                <div className="space-y-2">
+                  {nights === undefined ? (
+                    [...Array(3)].map((_, i) => (
+                      <Skeleton key={i} className="h-20 rounded-lg" />
+                    ))
+                  ) : upcomingNights && upcomingNights.length > 0 ? (
+                    upcomingNights
+                      .sort((a, b) => a.date - b.date)
+                      .map((night) => {
+                        const config = STATUS_CONFIG[night.status];
+                        return (
+                          <Link key={night._id} href={`/night/${night._id}`}>
+                            <Card className="hover:bg-accent/30 transition-colors cursor-pointer">
+                              <CardContent className="p-4">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-md bg-muted">
+                                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                                    </div>
+                                    <div>
+                                      <p className="font-medium text-sm">
+                                        {night.title}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground mt-0.5">
+                                        {new Date(night.date).toLocaleDateString(
+                                          "en-US",
+                                          {
+                                            weekday: "long",
+                                            month: "long",
+                                            day: "numeric",
+                                          },
+                                        )}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant={config.variant}>
+                                      {config.label}
+                                    </Badge>
+                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                  </div>
+                                </div>
+                                <div className="flex gap-3 mt-2 text-xs text-muted-foreground pl-11">
+                                  <span>
+                                    {night.attendees.length} attending
+                                  </span>
+                                  <span>·</span>
+                                  <span>
+                                    {night.candidates.length} candidates
+                                  </span>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </Link>
+                        );
+                      })
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Film className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                      <p className="text-sm">No upcoming nights</p>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="mt-1 h-auto p-0 text-xs"
+                        onClick={() => setCreateOpen(true)}
+                      >
+                        Schedule one now
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Past */}
+              {pastNights && pastNights.length > 0 && (
+                <div>
+                  <h2 className="font-semibold mb-3 text-muted-foreground">
+                    Past Nights
+                  </h2>
+                  <div className="space-y-2">
+                    {pastNights
+                      .sort((a, b) => b.date - a.date)
+                      .slice(0, 5)
+                      .map((night) => (
                         <Link key={night._id} href={`/night/${night._id}`}>
                           <Card className="hover:bg-accent/30 transition-colors cursor-pointer">
-                            <CardContent className="p-4">
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-3">
-                                  <div className="p-2 rounded-md bg-muted">
-                                    <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                            <CardContent className="p-3 flex items-center gap-3">
+                              {/* Movie poster thumbnail */}
+                              <div className="relative shrink-0 w-10 h-14 rounded overflow-hidden bg-muted">
+                                {night.pickedMovieData ? (
+                                  <Image
+                                    src={night.pickedMovieData.poster}
+                                    alt={night.pickedMovieData.title}
+                                    fill
+                                    className="object-cover"
+                                    sizes="40px"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <Film className="h-4 w-4 text-muted-foreground opacity-40" />
                                   </div>
-                                  <div>
-                                    <p className="font-medium text-sm">
-                                      {night.title}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground mt-0.5">
-                                      {new Date(night.date).toLocaleDateString(
-                                        "en-US",
-                                        {
-                                          weekday: "long",
-                                          month: "long",
-                                          day: "numeric",
-                                        },
-                                      )}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Badge variant={config.variant}>
-                                    {config.label}
-                                  </Badge>
-                                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">
+                                  {night.title}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {new Date(night.date).toLocaleDateString(
+                                    "en-US",
+                                    {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    },
+                                  )}
+                                </p>
+                                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                  {night.pickedMovieData?.imdbRating && (
+                                    <div className="flex items-center gap-1 bg-yellow-500/10 rounded px-1.5 py-0.5">
+                                      <span className="text-[10px] font-bold text-yellow-600">
+                                        IMDb
+                                      </span>
+                                      <span className="text-xs font-semibold">
+                                        {night.pickedMovieData.imdbRating.toFixed(
+                                          1,
+                                        )}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {night.avgRating != null && (
+                                    <span className="text-xs text-muted-foreground">
+                                      Group:{" "}
+                                      <span className="font-medium text-foreground">
+                                        {night.avgRating.toFixed(1)}
+                                      </span>
+                                    </span>
+                                  )}
                                 </div>
                               </div>
-                              <div className="flex gap-3 mt-2 text-xs text-muted-foreground pl-11">
-                                <span>
-                                  {night.attendees.length} attending
-                                </span>
-                                <span>·</span>
-                                <span>
-                                  {night.candidates.length} candidates
-                                </span>
-                              </div>
+
+                              <Badge variant="outline" className="text-xs shrink-0">
+                                Done
+                              </Badge>
                             </CardContent>
                           </Card>
                         </Link>
-                      );
-                    })
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Film className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                    <p className="text-sm">No upcoming nights</p>
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="mt-1 h-auto p-0 text-xs"
-                      onClick={() => setCreateOpen(true)}
-                    >
-                      Schedule one now
-                    </Button>
+                      ))}
                   </div>
-                )}
-              </div>
-            </div>
-
-            {/* Past */}
-            {pastNights && pastNights.length > 0 && (
-              <div>
-                <h2 className="font-semibold mb-3 text-muted-foreground">
-                  Past Nights
-                </h2>
-                <div className="space-y-2">
-                  {pastNights
-                    .sort((a, b) => b.date - a.date)
-                    .slice(0, 5)
-                    .map((night) => (
-                      <Link key={night._id} href={`/night/${night._id}`}>
-                        <Card className="hover:bg-accent/30 transition-colors cursor-pointer opacity-70">
-                          <CardContent className="p-3 flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium">
-                                {night.title}
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-0.5">
-                                {new Date(night.date).toLocaleDateString(
-                                  "en-US",
-                                  { month: "short", day: "numeric", year: "numeric" },
-                                )}
-                              </p>
-                            </div>
-                            <Badge variant="outline" className="text-xs">
-                              Done
-                            </Badge>
-                          </CardContent>
-                        </Card>
-                      </Link>
-                    ))}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      <CreateNightDialog
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-      />
+        <CreateNightDialog
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+        />
+      </NightDatesCtx.Provider>
     </AppShell>
   );
 }

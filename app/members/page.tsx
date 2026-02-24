@@ -22,34 +22,35 @@ export default function MembersPage() {
           </p>
         </div>
 
-        <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-4">
           {users === undefined ? (
             [...Array(6)].map((_, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-3 p-3 rounded-lg border border-border"
-              >
-                <Skeleton className="h-10 w-10 rounded-full" />
-                <div className="space-y-1.5">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-3 w-44" />
-                </div>
-              </div>
+              <Card key={i}>
+                <CardContent className="p-5 flex flex-col items-center text-center gap-3">
+                  <Skeleton className="h-16 w-16 rounded-full" />
+                  <div className="space-y-1.5 w-full">
+                    <Skeleton className="h-4 w-24 mx-auto" />
+                    <Skeleton className="h-3 w-32 mx-auto" />
+                  </div>
+                </CardContent>
+              </Card>
             ))
           ) : users.length > 0 ? (
             users.map((user) => (
               <Link key={user._id} href={`/profile/${user._id}`}>
-                <Card className="hover:bg-accent/30 transition-colors cursor-pointer">
-                  <CardContent className="p-3 flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
+                <Card className="hover:bg-accent/30 transition-colors cursor-pointer h-full">
+                  <CardContent className="p-5 flex flex-col items-center text-center gap-3">
+                    <Avatar className="h-16 w-16">
                       <AvatarImage src={user.avatar ?? undefined} />
-                      <AvatarFallback>
+                      <AvatarFallback className="text-xl">
                         {user.name?.[0]?.toUpperCase() ?? "?"}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="text-sm font-medium">{user.name}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="font-semibold text-sm">
+                        {user.name ?? "Unknown"}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate max-w-35">
                         {user.email}
                       </p>
                     </div>
@@ -58,7 +59,7 @@ export default function MembersPage() {
               </Link>
             ))
           ) : (
-            <div className="text-center py-12 text-muted-foreground">
+            <div className="col-span-2 text-center py-12 text-muted-foreground">
               <Users className="h-10 w-10 mx-auto mb-3 opacity-20" />
               <p className="text-sm">No members yet</p>
             </div>

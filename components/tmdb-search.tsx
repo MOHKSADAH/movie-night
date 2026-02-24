@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
-import { Search, Star, Plus, Check } from "lucide-react";
+import { Plus, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Id } from "@/convex/_generated/dataModel";
 
@@ -89,15 +89,17 @@ export function TMDBSearch({
     }
   }, []);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    search(query);
-  };
+  // Live debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      search(query);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [query, search]);
 
   const handleAdd = async (tmdbMovie: TmdbMovie) => {
     setAdding(tmdbMovie.id);
     try {
-      // Fetch detailed info
       const res = await fetch(`/api/tmdb/movie/${tmdbMovie.id}`);
       const detail: TmdbDetail = await res.json();
 
@@ -152,18 +154,12 @@ export function TMDBSearch({
         </DialogHeader>
 
         <div className="px-5 pb-3">
-          <form onSubmit={handleSearch} className="flex gap-2">
-            <Input
-              placeholder="Search for a movie..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              autoFocus
-              className="flex-1"
-            />
-            <Button type="submit" size="icon" variant="secondary">
-              <Search className="h-4 w-4" />
-            </Button>
-          </form>
+          <Input
+            placeholder="Search for a movie..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            autoFocus
+          />
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 pb-5 space-y-2">
@@ -189,7 +185,7 @@ export function TMDBSearch({
 
           {!loading && results.length === 0 && !query && (
             <p className="text-center text-sm text-muted-foreground py-8">
-              Search for a movie to add
+              Start typing to search movies
             </p>
           )}
 
@@ -223,16 +219,12 @@ export function TMDBSearch({
                   <p className="text-sm font-medium truncate">{movie.title}</p>
                   <div className="flex items-center gap-2 mt-0.5">
                     {year && (
-                      <span className="text-xs text-muted-foreground">
-                        {year}
-                      </span>
+                      <span className="text-xs text-muted-foreground">{year}</span>
                     )}
                     {movie.vote_average > 0 && (
-                      <div className="flex items-center gap-0.5">
-                        <Star className="h-2.5 w-2.5 fill-yellow-500 text-yellow-500" />
-                        <span className="text-xs text-muted-foreground">
-                          {movie.vote_average.toFixed(1)}
-                        </span>
+                      <div className="flex items-center gap-1 bg-yellow-500/10 rounded px-1.5 py-0.5">
+                        <span className="text-[10px] font-bold text-yellow-600">IMDb</span>
+                        <span className="text-xs font-semibold">{movie.vote_average.toFixed(1)}</span>
                       </div>
                     )}
                   </div>
@@ -262,5 +254,4 @@ export function TMDBSearch({
   );
 }
 
-// Inline badge for genres - reuse Badge from shadcn
 export { Badge };

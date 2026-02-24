@@ -88,7 +88,7 @@ function LogMovieDialog({
       setSearching(true);
       try {
         const res = await fetch(
-          `/api/tmdb/search?q=${encodeURIComponent(query)}`,
+          `/api/tmdb/search?query=${encodeURIComponent(query)}`,
         );
         const data = await res.json();
         setResults(data.results?.slice(0, 5) ?? []);
