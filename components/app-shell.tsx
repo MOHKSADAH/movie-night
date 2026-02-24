@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthActions } from "@convex-dev/auth/react";
@@ -17,6 +17,8 @@ import {
   LogOut,
   LayoutDashboard,
   Users,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,24 +33,24 @@ const navItems = [
 function LoadingScreen() {
   return (
     <div className="flex min-h-screen bg-background">
-      <aside className="hidden md:flex w-56 flex-col fixed inset-y-0 border-r border-border bg-sidebar">
-        <div className="flex h-14 items-center gap-2 px-4 border-b border-sidebar-border">
+      <aside className="hidden md:flex w-64 flex-col fixed inset-y-0 border-r border-border bg-sidebar">
+        <div className="flex h-16 items-center gap-3 px-5 border-b border-sidebar-border">
           <Film className="h-5 w-5 text-sidebar-primary" />
-          <span className="font-semibold text-sm tracking-tight text-sidebar-foreground">
+          <span className="font-semibold tracking-tight text-sidebar-foreground">
             Movie Night
           </span>
         </div>
-        <nav className="flex-1 px-2 py-3 space-y-0.5">
+        <nav className="flex-1 px-3 py-4 space-y-1">
           {navItems.map((item) => (
-            <div key={item.href} className="flex items-center gap-3 px-3 py-2">
+            <div key={item.href} className="flex items-center gap-3 px-3 py-2.5">
               <Skeleton className="h-4 w-4 rounded" />
               <Skeleton className="h-4 w-20" />
             </div>
           ))}
         </nav>
-        <div className="p-3 border-t border-sidebar-border">
-          <div className="flex items-center gap-2 px-2 py-1.5">
-            <Skeleton className="h-7 w-7 rounded-full" />
+        <div className="p-4 border-t border-sidebar-border">
+          <div className="flex items-center gap-3 px-2 py-2">
+            <Skeleton className="h-8 w-8 rounded-full" />
             <div className="flex-1 space-y-1">
               <Skeleton className="h-3 w-24" />
               <Skeleton className="h-2 w-16" />
@@ -56,7 +58,7 @@ function LoadingScreen() {
           </div>
         </div>
       </aside>
-      <main className="flex-1 md:ml-56 flex items-center justify-center">
+      <main className="flex-1 md:ml-64 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Film className="h-8 w-8 text-muted-foreground animate-pulse" />
           <p className="text-sm text-muted-foreground">Loading...</p>
@@ -73,34 +75,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const user = useQuery(api.users.getCurrentUser);
 
+  const [isDark, setIsDark] = useState(
+    () => typeof document !== "undefined" && document.documentElement.classList.contains("dark"),
+  );
+  const toggleTheme = () => {
+    const next = !isDark;
+    setIsDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+  };
+
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.replace("/login");
+      router.push("/login");
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isLoading, isAuthenticated, router]);
 
-  if (isLoading) {
+  if (isLoading || !isAuthenticated) {
     return <LoadingScreen />;
-  }
-
-  if (!isAuthenticated) {
-    return null;
   }
 
   return (
     <div className="flex min-h-screen bg-background">
       {/* Sidebar */}
-      <aside className="hidden md:flex w-56 flex-col fixed inset-y-0 border-r border-border bg-sidebar z-10">
+      <aside className="hidden md:flex w-64 flex-col fixed inset-y-0 border-r border-border bg-sidebar z-10">
         {/* Logo */}
-        <div className="flex h-14 items-center gap-2 px-4 border-b border-sidebar-border">
+        <div className="flex h-16 items-center gap-3 px-5 border-b border-sidebar-border">
           <Film className="h-5 w-5 text-sidebar-primary" />
-          <span className="font-semibold text-sm tracking-tight text-sidebar-foreground">
+          <span className="font-semibold tracking-tight text-sidebar-foreground">
             Movie Night
           </span>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-2 py-3 space-y-0.5">
+        <nav className="flex-1 px-3 py-4 space-y-1">
           {navItems.map((item) => {
             const isActive =
               item.href === "/"
@@ -111,7 +119,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                  "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors",
                   isActive
                     ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                     : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
@@ -125,42 +133,52 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* User */}
-        <div className="p-3 border-t border-sidebar-border space-y-1">
+        <div className="p-4 border-t border-sidebar-border space-y-1">
           {user && (
             <Link
               href={`/profile/${user._id}`}
               className={cn(
-                "flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors",
+                "flex items-center gap-3 rounded-md px-2 py-2 transition-colors",
                 pathname.startsWith("/profile")
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "hover:bg-sidebar-accent/60",
               )}
             >
-              <Avatar className="h-7 w-7 shrink-0">
+              <Avatar className="h-8 w-8 shrink-0">
                 <AvatarImage src={user.avatar ?? undefined} />
                 <AvatarFallback className="text-xs">
                   {user.name?.[0]?.toUpperCase() ?? "?"}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-sidebar-foreground truncate">
+                <p className="text-sm font-medium text-sidebar-foreground truncate">
                   {user.name ?? "My Profile"}
                 </p>
-                <p className="text-[10px] text-muted-foreground truncate">
+                <p className="text-xs text-muted-foreground truncate">
                   View profile
                 </p>
               </div>
             </Link>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground h-8 px-2"
-            onClick={() => signOut()}
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            Sign out
-          </Button>
+          <div className="flex gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-1 justify-start gap-2 text-muted-foreground hover:text-foreground h-9 px-2"
+              onClick={() => signOut()}
+            >
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 w-9 p-0 text-muted-foreground hover:text-foreground"
+              onClick={toggleTheme}
+            >
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
       </aside>
 
@@ -206,7 +224,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Main content */}
-      <main className="flex-1 md:ml-56 pb-16 md:pb-0 pt-14 md:pt-0">
+      <main className="flex-1 md:ml-64 pb-16 md:pb-0 pt-14 md:pt-0">
         {children}
       </main>
     </div>

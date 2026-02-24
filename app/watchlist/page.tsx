@@ -9,19 +9,44 @@ import { TMDBSearch } from "@/components/tmdb-search";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { Plus, Search, Film } from "lucide-react";
 import { toast } from "sonner";
 
+const PAGE_SIZE = 12;
+
 type SortOption = "votes" | "recent";
+
+function getPageItems(current: number, total: number): (number | "ellipsis")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i);
+  const items: (number | "ellipsis")[] = [0];
+  if (current > 2) items.push("ellipsis");
+  const start = Math.max(1, current - 1);
+  const end = Math.min(total - 2, current + 1);
+  for (let i = start; i <= end; i++) items.push(i);
+  if (current < total - 3) items.push("ellipsis");
+  items.push(total - 1);
+  return items;
+}
 
 export default function WatchlistPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortOption>("votes");
+  const [page, setPage] = useState(0);
 
   const user = useQuery(api.users.getCurrentUser);
   const watchlist = useQuery(api.watchlist.getWatchlist);
   const toggleUpvote = useMutation(api.watchlist.toggleUpvote);
+  const toggleDownvote = useMutation(api.watchlist.toggleDownvote);
   const removeFromWatchlist = useMutation(api.watchlist.removeFromWatchlist);
 
   const handleUpvote = async (entryId: string) => {
@@ -29,6 +54,14 @@ export default function WatchlistPage() {
       await toggleUpvote({ entryId: entryId as Parameters<typeof toggleUpvote>[0]["entryId"] });
     } catch {
       toast.error("Failed to upvote");
+    }
+  };
+
+  const handleDownvote = async (entryId: string) => {
+    try {
+      await toggleDownvote({ entryId: entryId as Parameters<typeof toggleDownvote>[0]["entryId"] });
+    } catch {
+      toast.error("Failed to downvote");
     }
   };
 
@@ -55,9 +88,22 @@ export default function WatchlistPage() {
       return b.addedAt - a.addedAt;
     });
 
+  const totalPages = Math.ceil((filteredList?.length ?? 0) / PAGE_SIZE);
+  const pagedList = filteredList?.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  const handleFilterChange = (val: string) => {
+    setFilter(val);
+    setPage(0);
+  };
+
+  const handleSortChange = (val: SortOption) => {
+    setSort(val);
+    setPage(0);
+  };
+
   return (
     <AppShell>
-      <div className="p-6 max-w-3xl mx-auto space-y-6">
+      <div className="p-6 max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -81,7 +127,7 @@ export default function WatchlistPage() {
             <Input
               placeholder="Filter by title or genre..."
               value={filter}
-              onChange={(e) => setFilter(e.target.value)}
+              onChange={(e) => handleFilterChange(e.target.value)}
               className="pl-9"
             />
           </div>
@@ -90,7 +136,7 @@ export default function WatchlistPage() {
               variant={sort === "votes" ? "secondary" : "ghost"}
               size="sm"
               className="h-8 text-xs"
-              onClick={() => setSort("votes")}
+              onClick={() => handleSortChange("votes")}
             >
               Top voted
             </Button>
@@ -98,69 +144,121 @@ export default function WatchlistPage() {
               variant={sort === "recent" ? "secondary" : "ghost"}
               size="sm"
               className="h-8 text-xs"
-              onClick={() => setSort("recent")}
+              onClick={() => handleSortChange("recent")}
             >
               Recent
             </Button>
           </div>
         </div>
 
-        {/* List */}
-        <div className="space-y-2">
-          {watchlist === undefined ? (
-            [...Array(5)].map((_, i) => (
-              <div
-                key={i}
-                className="flex gap-3 p-3 rounded-lg border border-border"
-              >
-                <Skeleton className="w-16 h-24 rounded shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-2/3" />
-                  <Skeleton className="h-3 w-1/4" />
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-7 w-20" />
+        {/* Grid */}
+        {watchlist === undefined ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {[...Array(10)].map((_, i) => (
+              <div key={i} className="rounded-lg border border-border overflow-hidden">
+                <Skeleton className="aspect-2/3 w-full" />
+                <div className="p-3 space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/3" />
+                  <Skeleton className="h-7 w-full" />
                 </div>
               </div>
-            ))
-          ) : filteredList && filteredList.length > 0 ? (
-            filteredList.map((entry) =>
-              entry.movie ? (
-                <WatchlistCard
-                  key={entry._id}
-                  movie={entry.movie}
-                  upvotes={entry.upvotes.length}
-                  hasUpvoted={user ? entry.upvotes.includes(user._id) : false}
-                  addedBy={entry.addedBy?.name ?? undefined}
-                  note={entry.note ?? undefined}
-                  onUpvote={() => handleUpvote(entry._id)}
-                  onRemove={() => handleRemove(entry._id)}
-                  canRemove={user ? entry.addedBy?._id === user._id : false}
-                />
-              ) : null,
-            )
-          ) : (
-            <div className="text-center py-16 text-muted-foreground">
-              <Film className="h-12 w-12 mx-auto mb-3 opacity-20" />
-              {filter ? (
-                <p className="text-sm">No movies match your filter</p>
-              ) : (
-                <>
-                  <p className="text-sm font-medium">Watchlist is empty</p>
-                  <p className="text-xs mt-1">
-                    Add movies to watch with your crew
-                  </p>
-                  <Button
-                    className="mt-4 gap-2"
-                    onClick={() => setSearchOpen(true)}
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add your first movie
-                  </Button>
-                </>
+            ))}
+          </div>
+        ) : pagedList && pagedList.length > 0 ? (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {pagedList.map((entry) =>
+                entry.movie ? (
+                  <WatchlistCard
+                    key={entry._id}
+                    movie={entry.movie}
+                    upvotes={entry.upvotes.length}
+                    hasUpvoted={user ? entry.upvotes.includes(user._id) : false}
+                    downvotes={(entry.downvotes ?? []).length}
+                    hasDownvoted={
+                      user ? (entry.downvotes ?? []).includes(user._id) : false
+                    }
+                    addedBy={entry.addedBy?.name ?? undefined}
+                    note={entry.note ?? undefined}
+                    onUpvote={() => handleUpvote(entry._id)}
+                    onDownvote={() => handleDownvote(entry._id)}
+                    onRemove={() => handleRemove(entry._id)}
+                    canRemove={user ? entry.addedBy?._id === user._id : false}
+                  />
+                ) : null,
               )}
             </div>
-          )}
-        </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      className={
+                        page === 0
+                          ? "pointer-events-none opacity-50"
+                          : "cursor-pointer"
+                      }
+                    />
+                  </PaginationItem>
+
+                  {getPageItems(page, totalPages).map((item, idx) =>
+                    item === "ellipsis" ? (
+                      <PaginationItem key={`ellipsis-${idx}`}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    ) : (
+                      <PaginationItem key={item}>
+                        <PaginationLink
+                          isActive={page === item}
+                          onClick={() => setPage(item)}
+                          className="cursor-pointer"
+                        >
+                          {item + 1}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ),
+                  )}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() =>
+                        setPage((p) => Math.min(totalPages - 1, p + 1))
+                      }
+                      className={
+                        page >= totalPages - 1
+                          ? "pointer-events-none opacity-50"
+                          : "cursor-pointer"
+                      }
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-16 text-muted-foreground">
+            <Film className="h-12 w-12 mx-auto mb-3 opacity-20" />
+            {filter ? (
+              <p className="text-sm">No movies match your filter</p>
+            ) : (
+              <>
+                <p className="text-sm font-medium">Watchlist is empty</p>
+                <p className="text-xs mt-1">Add movies to watch with your crew</p>
+                <Button
+                  className="mt-4 gap-2"
+                  onClick={() => setSearchOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                  Add your first movie
+                </Button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <TMDBSearch

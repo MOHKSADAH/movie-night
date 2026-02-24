@@ -35,6 +35,7 @@ type CalendarNight = {
     poster: string;
     imdbRating?: number;
   } | null;
+  firstCandidateData: { title: string; poster: string } | null;
   avgRating: number | null;
 };
 
@@ -47,17 +48,18 @@ function CalendarDayButton({ day, modifiers, ...props }: DayButtonProps) {
 
   const base = "h-14 w-14 p-0 rounded-md transition-colors";
 
+  // Night with a picked/final movie — full poster
   if (night?.pickedMovieData) {
     return (
       <button
         {...props}
-        className={cn(base, "relative overflow-hidden border border-primary/30")}
+        className={cn(base, "relative overflow-hidden border border-primary/40")}
       >
         <Image
           src={night.pickedMovieData.poster}
           alt={night.pickedMovieData.title}
           fill
-          className="object-cover opacity-55"
+          className="object-cover opacity-60"
           sizes="56px"
         />
         <span className="absolute top-0.5 left-1 text-[10px] font-bold text-white drop-shadow z-10">
@@ -72,6 +74,29 @@ function CalendarDayButton({ day, modifiers, ...props }: DayButtonProps) {
     );
   }
 
+  // Night with candidate movies (but no final pick) — dimmed poster + indicator
+  if (night?.firstCandidateData) {
+    return (
+      <button
+        {...props}
+        className={cn(base, "relative overflow-hidden border border-border")}
+      >
+        <Image
+          src={night.firstCandidateData.poster}
+          alt={night.firstCandidateData.title}
+          fill
+          className="object-cover opacity-25"
+          sizes="56px"
+        />
+        <span className="absolute top-0.5 left-1 text-[10px] font-bold text-white drop-shadow z-10">
+          {day.date.getDate()}
+        </span>
+        <span className="absolute bottom-1 right-1 w-1.5 h-1.5 rounded-full bg-primary z-10" />
+      </button>
+    );
+  }
+
+  // Night with no movies yet — dot indicator only
   if (night) {
     return (
       <button
@@ -84,7 +109,7 @@ function CalendarDayButton({ day, modifiers, ...props }: DayButtonProps) {
         )}
       >
         <span className="text-sm">{day.date.getDate()}</span>
-        <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+        <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60" />
       </button>
     );
   }
@@ -227,7 +252,7 @@ export default function CalendarPage() {
 
           <div className="grid md:grid-cols-[auto_1fr] gap-6">
             {/* Calendar */}
-            <Card className="self-start">
+            <Card className="self-start calendar-main">
               <CardContent className="p-4">
                 <DayPicker
                   month={selectedMonth}
@@ -235,8 +260,7 @@ export default function CalendarPage() {
                   components={{ DayButton: CalendarDayButton }}
                   classNames={{
                     weekday:
-                      "w-14 text-center text-xs text-muted-foreground font-normal pb-1",
-                    day: "w-14 h-14",
+                      "text-center text-xs text-muted-foreground font-normal pb-1",
                   }}
                 />
               </CardContent>
@@ -247,7 +271,7 @@ export default function CalendarPage() {
               {/* Upcoming */}
               <div>
                 <h2 className="font-semibold mb-3">Upcoming Nights</h2>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {nights === undefined ? (
                     [...Array(3)].map((_, i) => (
                       <Skeleton key={i} className="h-20 rounded-lg" />
@@ -326,7 +350,7 @@ export default function CalendarPage() {
                   <h2 className="font-semibold mb-3 text-muted-foreground">
                     Past Nights
                   </h2>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {pastNights
                       .sort((a, b) => b.date - a.date)
                       .slice(0, 5)

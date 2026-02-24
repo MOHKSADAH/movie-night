@@ -157,6 +157,7 @@ export const getCalendarNights = query({
           poster: string;
           imdbRating?: number;
         } | null = null;
+        let firstCandidateData: { title: string; poster: string } | null = null;
         let avgRating: number | null = null;
 
         if (night.pickedMovie) {
@@ -181,9 +182,17 @@ export const getCalendarNights = query({
             );
             avgRating = total / watchedEntry.ratings.length;
           }
+        } else if (night.candidates.length > 0) {
+          const firstCandidate = await ctx.db.get(night.candidates[0]);
+          if (firstCandidate) {
+            firstCandidateData = {
+              title: firstCandidate.title,
+              poster: firstCandidate.poster,
+            };
+          }
         }
 
-        return { ...night, pickedMovieData, avgRating };
+        return { ...night, pickedMovieData, firstCandidateData, avgRating };
       }),
     );
   },

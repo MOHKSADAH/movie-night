@@ -66,6 +66,25 @@ export const toggleUpvote = mutation({
   },
 });
 
+export const toggleDownvote = mutation({
+  args: { entryId: v.id("watchlist_entries") },
+  handler: async (ctx, { entryId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const entry = await ctx.db.get(entryId);
+    if (!entry) throw new Error("Entry not found");
+
+    const downvotes = entry.downvotes ?? [];
+    const hasDownvoted = downvotes.includes(userId);
+    await ctx.db.patch(entryId, {
+      downvotes: hasDownvoted
+        ? downvotes.filter((id) => id !== userId)
+        : [...downvotes, userId],
+    });
+  },
+});
+
 export const removeFromWatchlist = mutation({
   args: { entryId: v.id("watchlist_entries") },
   handler: async (ctx, { entryId }) => {

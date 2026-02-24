@@ -37,6 +37,7 @@ export default defineSchema({
     addedBy: v.id("users"),
     addedAt: v.number(),
     upvotes: v.array(v.id("users")),
+    downvotes: v.optional(v.array(v.id("users"))),
     note: v.optional(v.string()),
   }).index("by_movie", ["movieId"]),
 

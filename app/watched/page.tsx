@@ -4,10 +4,19 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { AppShell } from "@/components/app-shell";
+import { WatchedGridCard } from "@/components/movie-card";
 import { StarRating } from "@/components/star-rating";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import {
   Dialog,
   DialogContent,
@@ -15,12 +24,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Eye, Star, Search, Plus, X } from "lucide-react";
+import { Eye, Search, Plus, X } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { Id } from "@/convex/_generated/dataModel";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
+
+const PAGE_SIZE = 12;
 
 type WatchedEntry = {
   _id: Id<"watched_entries">;
@@ -54,6 +65,18 @@ type TmdbDetail = TmdbResult & {
   genres?: { id: number; name: string }[];
   runtime?: number;
 };
+
+function getPageItems(current: number, total: number): (number | "ellipsis")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i);
+  const items: (number | "ellipsis")[] = [0];
+  if (current > 2) items.push("ellipsis");
+  const start = Math.max(1, current - 1);
+  const end = Math.min(total - 2, current + 1);
+  for (let i = start; i <= end; i++) items.push(i);
+  if (current < total - 3) items.push("ellipsis");
+  items.push(total - 1);
+  return items;
+}
 
 function LogMovieDialog({
   open,
@@ -171,7 +194,6 @@ function LogMovieDialog({
           <DialogTitle>Log a Past Movie</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-2">
-          {/* Movie search / selected */}
           {!selectedMovie ? (
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Movie</label>
@@ -257,7 +279,6 @@ function LogMovieDialog({
             </div>
           )}
 
-          {/* Movie night link (optional) */}
           {pastNights.length > 0 && (
             <div className="space-y-1.5">
               <label className="text-sm font-medium">
@@ -286,7 +307,6 @@ function LogMovieDialog({
             </div>
           )}
 
-          {/* Date */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Date Watched</label>
             <div className="flex justify-center border border-border rounded-md py-2">
@@ -295,35 +315,10 @@ function LogMovieDialog({
                 selected={date}
                 onSelect={setDate}
                 disabled={{ after: new Date() }}
-                classNames={{
-                  months: "flex flex-col",
-                  month: "space-y-2",
-                  caption: "flex justify-center pt-1 relative items-center",
-                  caption_label: "text-sm font-medium",
-                  nav: "space-x-1 flex items-center",
-                  nav_button:
-                    "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 border border-border rounded-md flex items-center justify-center",
-                  nav_button_previous: "absolute left-1",
-                  nav_button_next: "absolute right-1",
-                  table: "w-full border-collapse",
-                  head_row: "flex",
-                  head_cell:
-                    "text-muted-foreground rounded-md w-8 font-normal text-[0.8rem]",
-                  row: "flex w-full mt-1",
-                  cell: "text-center text-sm p-0 relative",
-                  day: "h-8 w-8 p-0 font-normal rounded-md hover:bg-accent hover:text-accent-foreground",
-                  day_selected:
-                    "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
-                  day_today: "border border-border",
-                  day_disabled:
-                    "text-muted-foreground opacity-30 cursor-not-allowed",
-                  day_outside: "text-muted-foreground opacity-30",
-                }}
               />
             </div>
           </div>
 
-          {/* Rating */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Your Rating</label>
             <div className="flex justify-center">
@@ -331,7 +326,6 @@ function LogMovieDialog({
             </div>
           </div>
 
-          {/* Note */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">
               Note{" "}
@@ -433,6 +427,7 @@ function RatingDialog({
 
 export default function WatchedPage() {
   const [filter, setFilter] = useState("");
+  const [page, setPage] = useState(0);
   const [logOpen, setLogOpen] = useState(false);
   const [ratingEntry, setRatingEntry] = useState<WatchedEntry | null>(null);
 
@@ -444,9 +439,17 @@ export default function WatchedPage() {
     return entry.movie?.title.toLowerCase().includes(filter.toLowerCase());
   });
 
+  const totalPages = Math.ceil((filtered?.length ?? 0) / PAGE_SIZE);
+  const paged = filtered?.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  const handleFilterChange = (val: string) => {
+    setFilter(val);
+    setPage(0);
+  };
+
   return (
     <AppShell>
-      <div className="p-6 max-w-3xl mx-auto space-y-6">
+      <div className="p-6 max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -471,150 +474,124 @@ export default function WatchedPage() {
           <Input
             placeholder="Search watched movies..."
             value={filter}
-            onChange={(e) => setFilter(e.target.value)}
+            onChange={(e) => handleFilterChange(e.target.value)}
             className="pl-9"
           />
         </div>
 
-        {/* List */}
-        <div className="space-y-3">
-          {entries === undefined ? (
-            [...Array(5)].map((_, i) => (
-              <div
-                key={i}
-                className="flex gap-3 p-4 rounded-lg border border-border"
-              >
-                <Skeleton className="w-16 h-24 rounded shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-2/3" />
-                  <Skeleton className="h-3 w-1/4" />
-                  <Skeleton className="h-6 w-32" />
+        {/* Grid */}
+        {entries === undefined ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {[...Array(10)].map((_, i) => (
+              <div key={i} className="rounded-lg border border-border overflow-hidden">
+                <Skeleton className="aspect-2/3 w-full" />
+                <div className="p-3 space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                  <Skeleton className="h-7 w-full" />
                 </div>
               </div>
-            ))
-          ) : filtered && filtered.length > 0 ? (
-            filtered.map((entry) => {
-              if (!entry.movie) return null;
-              const avgRating =
-                entry.ratings.length > 0
-                  ? entry.ratings.reduce((s, r) => s + r.score, 0) /
-                    entry.ratings.length
+            ))}
+          </div>
+        ) : paged && paged.length > 0 ? (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {paged.map((entry) => {
+                if (!entry.movie) return null;
+                const avgRating =
+                  entry.ratings.length > 0
+                    ? entry.ratings.reduce((s, r) => s + r.score, 0) /
+                      entry.ratings.length
+                    : undefined;
+                const myRating = user
+                  ? entry.ratings.find((r) => r.userId === user._id)
                   : undefined;
-              const myRating = user
-                ? entry.ratings.find((r) => r.userId === user._id)
-                : undefined;
 
-              return (
-                <div
-                  key={entry._id}
-                  className="flex gap-3 p-4 rounded-lg border border-border bg-card"
-                >
-                  <div className="relative w-16 h-24 rounded overflow-hidden bg-muted shrink-0">
-                    {entry.movie.poster &&
-                      entry.movie.poster !== "/placeholder.jpg" && (
-                        <Image
-                          src={entry.movie.poster}
-                          alt={entry.movie.title}
-                          fill
-                          className="object-cover"
-                          sizes="64px"
-                        />
-                      )}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <h3 className="font-medium text-sm truncate">
-                          {entry.movie.title}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {entry.movie.releaseYear}
-                          {entry.movie.runtime
-                            ? ` · ${entry.movie.runtime}m`
-                            : ""}
-                        </p>
-                      </div>
-                      <Badge variant="outline" className="text-xs shrink-0">
-                        {new Date(entry.watchedAt).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </Badge>
-                    </div>
-
-                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      {entry.movie.imdbRating && (
-                        <div className="flex items-center gap-1 bg-yellow-500/10 rounded px-1.5 py-0.5">
-                          <span className="text-[10px] font-bold text-yellow-600">
-                            IMDb
-                          </span>
-                          <span className="text-xs font-semibold">
-                            {entry.movie.imdbRating.toFixed(1)}
-                          </span>
-                        </div>
-                      )}
-                      {avgRating !== undefined && (
-                        <div className="flex items-center gap-1">
-                          <Star className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500" />
-                          <span className="text-sm font-semibold">
-                            {avgRating.toFixed(1)}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            group ({entry.ratings.length})
-                          </span>
-                        </div>
-                      )}
-                      {myRating && (
-                        <Badge variant="secondary" className="text-xs">
-                          You: {myRating.score}/10
-                        </Badge>
-                      )}
-                    </div>
-
-                    {myRating?.note && (
-                      <p className="text-xs text-muted-foreground mt-1.5 italic line-clamp-1">
-                        &ldquo;{myRating.note}&rdquo;
-                      </p>
-                    )}
-
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="mt-2 h-7 text-xs px-2 -ml-2 text-muted-foreground hover:text-foreground"
-                      onClick={() => setRatingEntry(entry as WatchedEntry)}
-                    >
-                      <Star className="h-3 w-3 mr-1" />
-                      {myRating ? "Update rating" : "Rate this"}
-                    </Button>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="text-center py-16 text-muted-foreground">
-              <Eye className="h-12 w-12 mx-auto mb-3 opacity-20" />
-              {filter ? (
-                <p className="text-sm">No movies match your search</p>
-              ) : (
-                <>
-                  <p className="text-sm font-medium">No movies watched yet</p>
-                  <p className="text-xs mt-1">
-                    Log past movies or watch during a Movie Night
-                  </p>
-                  <Button
-                    variant="link"
-                    size="sm"
-                    className="mt-1 h-auto p-0 text-xs"
-                    onClick={() => setLogOpen(true)}
-                  >
-                    Log your first movie
-                  </Button>
-                </>
-              )}
+                return (
+                  <WatchedGridCard
+                    key={entry._id}
+                    movie={entry.movie}
+                    watchedAt={entry.watchedAt}
+                    avgRating={avgRating}
+                    myRating={myRating}
+                    ratingCount={entry.ratings.length}
+                    onClick={() => setRatingEntry(entry as WatchedEntry)}
+                  />
+                );
+              })}
             </div>
-          )}
-        </div>
+
+            {totalPages > 1 && (
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      className={
+                        page === 0
+                          ? "pointer-events-none opacity-50"
+                          : "cursor-pointer"
+                      }
+                    />
+                  </PaginationItem>
+
+                  {getPageItems(page, totalPages).map((item, idx) =>
+                    item === "ellipsis" ? (
+                      <PaginationItem key={`ellipsis-${idx}`}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    ) : (
+                      <PaginationItem key={item}>
+                        <PaginationLink
+                          isActive={page === item}
+                          onClick={() => setPage(item)}
+                          className="cursor-pointer"
+                        >
+                          {item + 1}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ),
+                  )}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() =>
+                        setPage((p) => Math.min(totalPages - 1, p + 1))
+                      }
+                      className={
+                        page >= totalPages - 1
+                          ? "pointer-events-none opacity-50"
+                          : "cursor-pointer"
+                      }
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-16 text-muted-foreground">
+            <Eye className="h-12 w-12 mx-auto mb-3 opacity-20" />
+            {filter ? (
+              <p className="text-sm">No movies match your search</p>
+            ) : (
+              <>
+                <p className="text-sm font-medium">No movies watched yet</p>
+                <p className="text-xs mt-1">
+                  Log past movies or watch during a Movie Night
+                </p>
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="mt-1 h-auto p-0 text-xs"
+                  onClick={() => setLogOpen(true)}
+                >
+                  Log your first movie
+                </Button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <LogMovieDialog open={logOpen} onClose={() => setLogOpen(false)} />
