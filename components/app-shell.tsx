@@ -224,8 +224,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Main content */}
-      <main className="flex-1 md:ml-64 pb-16 md:pb-0 pt-14 md:pt-0">
-        {children}
+      <main className="flex-1 md:ml-64 pb-16 md:pb-0 pt-14 md:pt-0 flex flex-col">
+        <div className="flex-1">{children}</div>
+        <footer className="py-5 text-center border-t border-border">
+          <p className="text-xs text-muted-foreground">
+            &copy; {new Date().getFullYear()} Mohammad Al-Sadah
+          </p>
+        </footer>
       </main>
     </div>
   );
