@@ -1,0 +1,48 @@
+import { mutation, query } from "./_generated/server";
+import { v } from "convex/values";
+import { getAuthUserId } from "@convex-dev/auth/server";
+
+export const upsertMovie = mutation({
+  args: {
+    tmdbId: v.number(),
+    title: v.string(),
+    poster: v.string(),
+    backdrop: v.optional(v.string()),
+    overview: v.string(),
+    genres: v.array(v.string()),
+    runtime: v.optional(v.number()),
+    releaseYear: v.number(),
+    imdbRating: v.optional(v.number()),
+    imdbVotes: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const existing = await ctx.db
+      .query("movies")
+      .withIndex("by_tmdbId", (q) => q.eq("tmdbId", args.tmdbId))
+      .first();
+
+    if (existing) return existing._id;
+
+    return await ctx.db.insert("movies", args);
+  },
+});
+
+export const getMovieById = query({
+  args: { movieId: v.id("movies") },
+  handler: async (ctx, { movieId }) => {
+    return await ctx.db.get(movieId);
+  },
+});
+
+export const getMovieByTmdbId = query({
+  args: { tmdbId: v.number() },
+  handler: async (ctx, { tmdbId }) => {
+    return await ctx.db
+      .query("movies")
+      .withIndex("by_tmdbId", (q) => q.eq("tmdbId", tmdbId))
+      .first();
+  },
+});

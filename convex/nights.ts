@@ -1,0 +1,143 @@
+import { mutation, query } from "./_generated/server";
+import { v } from "convex/values";
+import { getAuthUserId } from "@convex-dev/auth/server";
+
+export const getNights = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    return await ctx.db.query("movie_nights").order("desc").collect();
+  },
+});
+
+export const getUpcomingNights = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    return await ctx.db
+      .query("movie_nights")
+      .withIndex("by_status", (q) => q.eq("status", "upcoming"))
+      .collect();
+  },
+});
+
+export const getNight = query({
+  args: { nightId: v.id("movie_nights") },
+  handler: async (ctx, { nightId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    const night = await ctx.db.get(nightId);
+    if (!night) return null;
+
+    const candidateMovies = await Promise.all(
+      night.candidates.map((id) => ctx.db.get(id)),
+    );
+    const pickedMovieData = night.pickedMovie
+      ? await ctx.db.get(night.pickedMovie)
+      : null;
+    const host = await ctx.db.get(night.hostId);
+    const attendeeUsers = await Promise.all(
+      night.attendees.map((id) => ctx.db.get(id)),
+    );
+
+    return {
+      ...night,
+      candidateMovies: candidateMovies.filter(Boolean),
+      pickedMovieData,
+      host,
+      attendeeUsers: attendeeUsers.filter(Boolean),
+    };
+  },
+});
+
+export const createNight = mutation({
+  args: {
+    title: v.string(),
+    date: v.number(),
+  },
+  handler: async (ctx, { title, date }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    return await ctx.db.insert("movie_nights", {
+      title,
+      date,
+      hostId: userId,
+      status: "upcoming",
+      attendees: [userId],
+      candidates: [],
+    });
+  },
+});
+
+export const addCandidate = mutation({
+  args: {
+    nightId: v.id("movie_nights"),
+    movieId: v.id("movies"),
+  },
+  handler: async (ctx, { nightId, movieId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const night = await ctx.db.get(nightId);
+    if (!night) throw new Error("Night not found");
+
+    if (!night.candidates.includes(movieId)) {
+      await ctx.db.patch(nightId, {
+        candidates: [...night.candidates, movieId],
+      });
+    }
+  },
+});
+
+export const pickMovie = mutation({
+  args: {
+    nightId: v.id("movie_nights"),
+    movieId: v.id("movies"),
+  },
+  handler: async (ctx, { nightId, movieId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    await ctx.db.patch(nightId, {
+      pickedMovie: movieId,
+      status: "active",
+    });
+  },
+});
+
+export const updateNightStatus = mutation({
+  args: {
+    nightId: v.id("movie_nights"),
+    status: v.union(
+      v.literal("upcoming"),
+      v.literal("active"),
+      v.literal("done"),
+    ),
+  },
+  handler: async (ctx, { nightId, status }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    await ctx.db.patch(nightId, { status });
+  },
+});
+
+export const joinNight = mutation({
+  args: { nightId: v.id("movie_nights") },
+  handler: async (ctx, { nightId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const night = await ctx.db.get(nightId);
+    if (!night) throw new Error("Night not found");
+
+    if (!night.attendees.includes(userId)) {
+      await ctx.db.patch(nightId, {
+        attendees: [...night.attendees, userId],
+      });
+    }
+  },
+});

@@ -1,0 +1,74 @@
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
+import { authTables } from "@convex-dev/auth/server";
+
+export default defineSchema({
+  ...authTables,
+
+  users: defineTable({
+    // Fields required by @convex-dev/auth (all optional)
+    name: v.optional(v.string()),
+    image: v.optional(v.string()),
+    email: v.optional(v.string()),
+    emailVerificationTime: v.optional(v.number()),
+    phone: v.optional(v.string()),
+    phoneVerificationTime: v.optional(v.number()),
+    isAnonymous: v.optional(v.boolean()),
+    // App-specific fields
+    avatar: v.optional(v.string()),
+    createdAt: v.optional(v.number()),
+  }).index("email", ["email"]),
+
+  movies: defineTable({
+    tmdbId: v.number(),
+    title: v.string(),
+    poster: v.string(),
+    backdrop: v.optional(v.string()),
+    overview: v.string(),
+    genres: v.array(v.string()),
+    runtime: v.optional(v.number()),
+    releaseYear: v.number(),
+    imdbRating: v.optional(v.number()),
+    imdbVotes: v.optional(v.number()),
+  }).index("by_tmdbId", ["tmdbId"]),
+
+  watchlist_entries: defineTable({
+    movieId: v.id("movies"),
+    addedBy: v.id("users"),
+    addedAt: v.number(),
+    upvotes: v.array(v.id("users")),
+    note: v.optional(v.string()),
+  }).index("by_movie", ["movieId"]),
+
+  movie_nights: defineTable({
+    title: v.string(),
+    date: v.number(),
+    hostId: v.id("users"),
+    status: v.union(
+      v.literal("upcoming"),
+      v.literal("active"),
+      v.literal("done"),
+    ),
+    attendees: v.array(v.id("users")),
+    candidates: v.array(v.id("movies")),
+    pickedMovie: v.optional(v.id("movies")),
+  })
+    .index("by_status", ["status"])
+    .index("by_date", ["date"]),
+
+  watched_entries: defineTable({
+    movieId: v.id("movies"),
+    nightId: v.optional(v.id("movie_nights")),
+    pickedBy: v.optional(v.id("users")),
+    watchedAt: v.number(),
+    ratings: v.array(
+      v.object({
+        userId: v.id("users"),
+        score: v.number(),
+        note: v.optional(v.string()),
+      }),
+    ),
+  })
+    .index("by_movie", ["movieId"])
+    .index("by_night", ["nightId"]),
+});
