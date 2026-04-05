@@ -192,7 +192,20 @@ export const getCalendarNights = query({
           }
         }
 
-        return { ...night, pickedMovieData, firstCandidateData, avgRating };
+        const candidateMovies = await Promise.all(
+          night.candidates.slice(0, 3).map((id) => ctx.db.get(id)),
+        );
+        const candidatePosters = candidateMovies
+          .filter((m): m is NonNullable<typeof m> => m !== null)
+          .map((m) => ({ title: m.title, poster: m.poster }));
+
+        return {
+          ...night,
+          pickedMovieData,
+          firstCandidateData,
+          avgRating,
+          candidatePosters,
+        };
       }),
     );
   },

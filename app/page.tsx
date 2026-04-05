@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { AppShell } from "@/components/app-shell";
+import { MovieDetailDialog } from "@/components/movie-detail-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -54,6 +56,19 @@ function StatCard({
   );
 }
 
+type DetailMovie = {
+  _id: string;
+  title: string;
+  poster: string;
+  backdrop?: string;
+  releaseYear: number;
+  imdbRating?: number;
+  imdbVotes?: number;
+  genres: string[];
+  overview: string;
+  runtime?: number;
+};
+
 export default function DashboardPage() {
   const user = useQuery(api.users.getCurrentUser);
   const watchlistCount = useQuery(api.watchlist.getWatchlistCount);
@@ -61,6 +76,9 @@ export default function DashboardPage() {
   const upcomingNights = useQuery(api.nights.getUpcomingNights);
   const recentWatched = useQuery(api.watched.getRecentWatched, { limit: 3 });
   const watchlist = useQuery(api.watchlist.getWatchlist);
+
+  const [detailMovie, setDetailMovie] = useState<DetailMovie | null>(null);
+  const [detailMode, setDetailMode] = useState<"watched" | null>(null);
 
   const nextNight = upcomingNights?.[0];
   const topPicks = watchlist?.slice(0, 3);
@@ -81,7 +99,7 @@ export default function DashboardPage() {
           ) : (
             <div className="flex items-center gap-3">
               <Avatar className="h-10 w-10">
-                <AvatarImage src={user?.avatar ?? undefined} />
+                <AvatarImage src={user?.avatar ?? user?.image ?? undefined} />
                 <AvatarFallback>
                   {user?.name?.[0]?.toUpperCase() ?? "?"}
                 </AvatarFallback>
@@ -218,7 +236,8 @@ export default function DashboardPage() {
                   entry.movie ? (
                     <div
                       key={entry._id}
-                      className="flex gap-3 p-3.5 rounded-lg border border-border bg-card"
+                      className="flex gap-3 p-3.5 rounded-lg border border-border bg-card cursor-pointer hover:bg-accent/30 transition-colors"
+                      onClick={() => setDetailMovie(entry.movie as DetailMovie)}
                     >
                       <div className="relative w-14 h-21 rounded overflow-hidden bg-muted shrink-0">
                         {entry.movie.poster &&
@@ -239,6 +258,19 @@ export default function DashboardPage() {
                         <p className="text-xs text-muted-foreground">
                           {entry.movie.releaseYear}
                         </p>
+                        {entry.movie.genres.length > 0 && (
+                          <div className="flex gap-1 mt-1 flex-wrap">
+                            {entry.movie.genres.slice(0, 2).map((g) => (
+                              <Badge
+                                key={g}
+                                variant="secondary"
+                                className="text-[10px] h-4 px-1.5"
+                              >
+                                {g}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                         <div className="flex items-center gap-3 mt-2">
                           {entry.movie.imdbRating != null && (
                             <span className="text-xs text-muted-foreground">
@@ -307,7 +339,11 @@ export default function DashboardPage() {
                   return (
                     <div
                       key={entry._id}
-                      className="flex gap-3 p-3.5 rounded-lg border border-border bg-card"
+                      className="flex gap-3 p-3.5 rounded-lg border border-border bg-card cursor-pointer hover:bg-accent/30 transition-colors"
+                      onClick={() => {
+                        setDetailMovie(entry.movie as DetailMovie);
+                        setDetailMode("watched");
+                      }}
                     >
                       <div className="relative w-14 h-21 rounded overflow-hidden bg-muted shrink-0">
                         {entry.movie.poster &&
@@ -351,7 +387,7 @@ export default function DashboardPage() {
                                 {avgRating.toFixed(1)}
                               </span>
                               <span className="text-muted-foreground">
-                                group
+                                ({entry.ratings.length})
                               </span>
                             </span>
                           )}
@@ -370,6 +406,23 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      <MovieDetailDialog
+        movie={detailMovie}
+        open={!!detailMovie}
+        onClose={() => {
+          setDetailMovie(null);
+          setDetailMode(null);
+        }}
+        onRate={
+          detailMode === "watched"
+            ? () => {
+                setDetailMovie(null);
+                setDetailMode(null);
+              }
+            : undefined
+        }
+      />
     </AppShell>
   );
 }

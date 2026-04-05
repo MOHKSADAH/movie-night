@@ -32,7 +32,23 @@ export const addWatchedEntry = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
-    return await ctx.db.insert("watched_entries", { ...args, ratings: [] });
+
+    const entryId = await ctx.db.insert("watched_entries", {
+      ...args,
+      ratings: [],
+    });
+
+    // Auto-remove from shared watchlist if present
+    const watchlistEntry = await ctx.db
+      .query("watchlist_entries")
+      .withIndex("by_movie", (q) => q.eq("movieId", args.movieId))
+      .first();
+
+    if (watchlistEntry) {
+      await ctx.db.delete(watchlistEntry._id);
+    }
+
+    return entryId;
   },
 });
 
@@ -86,6 +102,20 @@ export const getUserStats = query({
             userRatings.length
           : 0,
     };
+  },
+});
+
+export const deleteWatchedEntry = mutation({
+  args: { entryId: v.id("watched_entries") },
+  handler: async (ctx, { entryId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const caller = await ctx.db.get(userId);
+    const ownerEmail = process.env.APP_OWNER_EMAIL;
+    const callerIsOwner =
+      !!ownerEmail && !!caller?.email && caller.email === ownerEmail;
+    if (!callerIsOwner) throw new Error("Not authorized");
+    await ctx.db.delete(entryId);
   },
 });
 

@@ -9,9 +9,11 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as collections from "../collections.js";
 import type * as http from "../http.js";
 import type * as movies from "../movies.js";
 import type * as nights from "../nights.js";
+import type * as restaurants from "../restaurants.js";
 import type * as users from "../users.js";
 import type * as watched from "../watched.js";
 import type * as watchlist from "../watchlist.js";
@@ -24,9 +26,11 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  collections: typeof collections;
   http: typeof http;
   movies: typeof movies;
   nights: typeof nights;
+  restaurants: typeof restaurants;
   users: typeof users;
   watched: typeof watched;
   watchlist: typeof watchlist;

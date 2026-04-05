@@ -49,7 +49,7 @@ interface TMDBSearchProps {
   open: boolean;
   onClose: () => void;
   onMovieAdded?: (movieId: Id<"movies">) => void;
-  mode?: "watchlist" | "candidate";
+  mode?: "watchlist" | "candidate" | "collection";
   nightId?: Id<"movie_nights">;
 }
 
@@ -126,6 +126,8 @@ export function TMDBSearch({
       } else if (mode === "candidate" && nightId) {
         await addCandidate({ nightId, movieId });
         toast.success(`"${detail.title}" added as candidate`);
+      } else if (mode === "collection") {
+        // parent handles adding to collection via onMovieAdded callback
       }
 
       setAdded((prev) => new Set(prev).add(tmdbMovie.id));
@@ -149,7 +151,11 @@ export function TMDBSearch({
       <DialogContent className="max-w-lg max-h-[80vh] flex flex-col gap-0 p-0">
         <DialogHeader className="px-5 pt-5 pb-4">
           <DialogTitle>
-            {mode === "watchlist" ? "Add to Watchlist" : "Add Candidate"}
+            {mode === "watchlist"
+              ? "Add to Watchlist"
+              : mode === "collection"
+                ? "Add to Collection"
+                : "Add Candidate"}
           </DialogTitle>
         </DialogHeader>
 

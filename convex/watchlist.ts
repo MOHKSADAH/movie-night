@@ -8,13 +8,19 @@ export const getWatchlist = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
+    // Collect all watched movieIds to exclude from watchlist
+    const watchedEntries = await ctx.db.query("watched_entries").collect();
+    const watchedMovieIds = new Set(watchedEntries.map((e) => e.movieId));
+
     const entries = await ctx.db.query("watchlist_entries").collect();
     const enriched = await Promise.all(
-      entries.map(async (entry) => {
-        const movie = await ctx.db.get(entry.movieId);
-        const addedBy = await ctx.db.get(entry.addedBy);
-        return { ...entry, movie, addedBy };
-      }),
+      entries
+        .filter((entry) => !watchedMovieIds.has(entry.movieId))
+        .map(async (entry) => {
+          const movie = await ctx.db.get(entry.movieId);
+          const addedBy = await ctx.db.get(entry.addedBy);
+          return { ...entry, movie, addedBy };
+        }),
     );
     return enriched
       .filter((e) => e.movie !== null)

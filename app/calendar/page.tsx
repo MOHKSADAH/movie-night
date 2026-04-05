@@ -37,6 +37,7 @@ type CalendarNight = {
   } | null;
   firstCandidateData: { title: string; poster: string } | null;
   avgRating: number | null;
+  candidatePosters?: { title: string; poster: string }[];
 };
 
 // Context to share nightDates map with the custom DayButton (avoids component-in-render)
@@ -313,15 +314,40 @@ export default function CalendarPage() {
                                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                   </div>
                                 </div>
-                                <div className="flex gap-3 mt-2 text-xs text-muted-foreground pl-11">
-                                  <span>
+                                <div className="flex items-center gap-3 mt-2 pl-11">
+                                  <span className="text-xs text-muted-foreground">
                                     {night.attendees.length} attending
                                   </span>
-                                  <span>·</span>
-                                  <span>
+                                  <span className="text-xs text-muted-foreground">·</span>
+                                  <span className="text-xs text-muted-foreground">
                                     {night.candidates.length} candidates
                                   </span>
                                 </div>
+                                {night.candidatePosters && night.candidatePosters.length > 0 && (
+                                  <div className="flex gap-1.5 mt-2 pl-11">
+                                    {night.candidatePosters.map((c, i) => (
+                                      <div
+                                        key={i}
+                                        className="relative w-8 h-12 rounded overflow-hidden bg-muted shrink-0"
+                                      >
+                                        <Image
+                                          src={c.poster}
+                                          alt={c.title}
+                                          fill
+                                          className="object-cover"
+                                          sizes="32px"
+                                        />
+                                      </div>
+                                    ))}
+                                    {night.candidates.length > 3 && (
+                                      <div className="relative w-8 h-12 rounded overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+                                        <span className="text-[10px] font-medium text-muted-foreground">
+                                          +{night.candidates.length - 3}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </CardContent>
                             </Card>
                           </Link>

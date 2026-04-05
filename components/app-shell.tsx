@@ -9,8 +9,8 @@ import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BrandLogo } from "@/components/brand-logo";
 import {
-  Film,
   List,
   Eye,
   CalendarDays,
@@ -19,6 +19,9 @@ import {
   Users,
   Moon,
   Sun,
+  BookMarked,
+  Utensils,
+  Crown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +29,9 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/watchlist", label: "Watchlist", icon: List },
   { href: "/watched", label: "Watched", icon: Eye },
+  { href: "/food", label: "Food", icon: Utensils },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/collections", label: "Collections", icon: BookMarked },
   { href: "/members", label: "Members", icon: Users },
 ];
 
@@ -34,11 +39,8 @@ function LoadingScreen() {
   return (
     <div className="flex min-h-screen bg-background">
       <aside className="hidden md:flex w-64 flex-col fixed inset-y-0 border-r border-border bg-sidebar">
-        <div className="flex h-16 items-center gap-3 px-5 border-b border-sidebar-border">
-          <Film className="h-5 w-5 text-sidebar-primary" />
-          <span className="font-semibold tracking-tight text-sidebar-foreground">
-            Movie Night
-          </span>
+        <div className="flex h-24 items-center justify-center px-5 border-b border-sidebar-border">
+          <BrandLogo className="h-16" />
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
           {navItems.map((item) => (
@@ -60,7 +62,7 @@ function LoadingScreen() {
       </aside>
       <main className="flex-1 md:ml-64 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <Film className="h-8 w-8 text-muted-foreground animate-pulse" />
+          <BrandLogo className="h-12 opacity-70 animate-pulse" />
           <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       </main>
@@ -100,11 +102,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside className="hidden md:flex w-64 flex-col fixed inset-y-0 border-r border-border bg-sidebar z-10">
         {/* Logo */}
-        <div className="flex h-16 items-center gap-3 px-5 border-b border-sidebar-border">
-          <Film className="h-5 w-5 text-sidebar-primary" />
-          <span className="font-semibold tracking-tight text-sidebar-foreground">
-            Movie Night
-          </span>
+        <div className="flex h-24 items-center justify-center px-5 border-b border-sidebar-border">
+          <BrandLogo className="h-16" priority />
         </div>
 
         {/* Nav */}
@@ -145,15 +144,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             >
               <Avatar className="h-8 w-8 shrink-0">
-                <AvatarImage src={user.avatar ?? undefined} />
+                <AvatarImage src={user.avatar ?? user.image ?? undefined} />
                 <AvatarFallback className="text-xs">
                   {user.name?.[0]?.toUpperCase() ?? "?"}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">
-                  {user.name ?? "My Profile"}
-                </p>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <p className="text-sm font-medium text-sidebar-foreground truncate">
+                    {user.name ?? "My Profile"}
+                  </p>
+                  {(user as { isOwner?: boolean }).isOwner && (
+                    <Crown className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground truncate">
                   View profile
                 </p>
@@ -184,14 +188,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 inset-x-0 h-14 border-b border-border bg-background flex items-center justify-between px-4 z-10">
-        <div className="flex items-center gap-2">
-          <Film className="h-5 w-5" />
-          <span className="font-semibold text-sm">Movie Night</span>
+        <div className="flex items-center">
+          <BrandLogo className="h-8" priority />
         </div>
         {user && (
           <Link href={`/profile/${user._id}`}>
             <Avatar className="h-8 w-8">
-              <AvatarImage src={user.avatar ?? undefined} />
+              <AvatarImage src={user.avatar ?? user.image ?? undefined} />
               <AvatarFallback className="text-xs">
                 {user.name?.[0]?.toUpperCase() ?? "?"}
               </AvatarFallback>
@@ -202,7 +205,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile bottom nav */}
       <div className="md:hidden fixed bottom-0 inset-x-0 h-16 border-t border-border bg-background flex items-center justify-around z-10">
-        {navItems.slice(0, 4).map((item) => {
+        {navItems.slice(0, 5).map((item) => {
           const isActive =
             item.href === "/"
               ? pathname === "/"

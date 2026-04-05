@@ -5,6 +5,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { AppShell } from "@/components/app-shell";
 import { WatchedGridCard } from "@/components/movie-card";
+import { MovieDetailDialog } from "@/components/movie-detail-dialog";
 import { StarRating } from "@/components/star-rating";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -141,8 +142,8 @@ function LogMovieDialog({
   };
 
   const handleSubmit = async () => {
-    if (!selectedMovie || !date || score === 0) {
-      toast.error("Please select a movie, date, and rating");
+    if (!selectedMovie || score === 0) {
+      toast.error("Please select a movie and a rating");
       return;
     }
     setSaving(true);
@@ -166,7 +167,7 @@ function LogMovieDialog({
       });
       const entryId = await addWatchedEntry({
         movieId,
-        watchedAt: date.getTime(),
+        watchedAt: date ? date.getTime() : Date.now(),
         nightId:
           nightId !== "none"
             ? (nightId as Id<"movie_nights">)
@@ -308,7 +309,10 @@ function LogMovieDialog({
           )}
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Date Watched</label>
+            <label className="text-sm font-medium">
+              Date Watched{" "}
+              <span className="text-muted-foreground font-normal">(optional)</span>
+            </label>
             <div className="flex justify-center border border-border rounded-md py-2">
               <DayPicker
                 mode="single"
@@ -317,6 +321,11 @@ function LogMovieDialog({
                 disabled={{ after: new Date() }}
               />
             </div>
+            {!date && (
+              <p className="text-xs text-muted-foreground text-center">
+                No date selected — will use today
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -347,7 +356,7 @@ function LogMovieDialog({
             <Button
               className="flex-1"
               onClick={handleSubmit}
-              disabled={saving || !selectedMovie || !date || score === 0}
+              disabled={saving || !selectedMovie || score === 0}
             >
               {saving ? "Saving..." : "Log movie"}
             </Button>
@@ -430,9 +439,20 @@ export default function WatchedPage() {
   const [page, setPage] = useState(0);
   const [logOpen, setLogOpen] = useState(false);
   const [ratingEntry, setRatingEntry] = useState<WatchedEntry | null>(null);
+  const [detailEntry, setDetailEntry] = useState<WatchedEntry | null>(null);
 
   const user = useQuery(api.users.getCurrentUser);
   const entries = useQuery(api.watched.getWatchedEntries);
+  const deleteWatchedEntry = useMutation(api.watched.deleteWatchedEntry);
+
+  const handleDelete = async (entryId: Id<"watched_entries">) => {
+    try {
+      await deleteWatchedEntry({ entryId });
+      toast.success("Entry deleted");
+    } catch {
+      toast.error("Failed to delete");
+    }
+  };
 
   const filtered = entries?.filter((entry) => {
     if (!filter) return true;
@@ -515,7 +535,10 @@ export default function WatchedPage() {
                     avgRating={avgRating}
                     myRating={myRating}
                     ratingCount={entry.ratings.length}
-                    onClick={() => setRatingEntry(entry as WatchedEntry)}
+                    onClick={() => setDetailEntry(entry as WatchedEntry)}
+                    onDelete={(user as { isOwner?: boolean } | null)?.isOwner
+                      ? () => handleDelete(entry._id)
+                      : undefined}
                   />
                 );
               })}
@@ -604,6 +627,16 @@ export default function WatchedPage() {
           onClose={() => setRatingEntry(null)}
         />
       )}
+
+      <MovieDetailDialog
+        movie={detailEntry?.movie ?? null}
+        open={!!detailEntry}
+        onClose={() => setDetailEntry(null)}
+        onRate={() => {
+          setRatingEntry(detailEntry);
+          setDetailEntry(null);
+        }}
+      />
     </AppShell>
   );
 }

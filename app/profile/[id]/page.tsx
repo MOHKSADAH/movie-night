@@ -1,17 +1,30 @@
 "use client";
 
-import { use } from "react";
-import { useQuery } from "convex/react";
+import { use, useState } from "react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { AppShell } from "@/components/app-shell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Star, List, Eye } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import { Star, List, Eye, Pencil, Crown } from "lucide-react";
 import Image from "next/image";
+import { toast } from "sonner";
 
 export default function ProfilePage({
   params,
@@ -26,8 +39,39 @@ export default function ProfilePage({
   const stats = useQuery(api.watched.getUserStats, { userId });
   const watchedEntries = useQuery(api.watched.getWatchedEntries);
   const watchlist = useQuery(api.watchlist.getWatchlist);
+  const updateUser = useMutation(api.users.updateUser);
 
   const isOwnProfile = currentUser?._id === userId;
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editAvatar, setEditAvatar] = useState("");
+  const [editBio, setEditBio] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleOpenEdit = () => {
+    setEditName(profileUser?.name ?? "");
+    setEditAvatar(profileUser?.avatar ?? "");
+    setEditBio((profileUser as { bio?: string } | null | undefined)?.bio ?? "");
+    setEditOpen(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateUser({
+        name: editName.trim() || undefined,
+        avatar: editAvatar.trim() || undefined,
+        bio: editBio.trim() || undefined,
+      });
+      toast.success("Profile updated");
+      setEditOpen(false);
+    } catch {
+      toast.error("Failed to update profile");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Filter entries relevant to this user
   const userRatings = watchedEntries
@@ -72,27 +116,49 @@ export default function ProfilePage({
     );
   }
 
+  const avatarSrc =
+    profileUser.avatar ??
+    (profileUser as { image?: string }).image ??
+    undefined;
+
   return (
     <AppShell>
       <div className="p-6 max-w-2xl mx-auto space-y-6">
         {/* Profile header */}
-        <div className="flex items-center gap-4">
-          <Avatar className="h-16 w-16">
-            <AvatarImage src={profileUser.avatar ?? undefined} />
+        <div className="flex items-start gap-4">
+          <Avatar className="h-16 w-16 shrink-0">
+            <AvatarImage src={avatarSrc} />
             <AvatarFallback className="text-xl">
               {profileUser.name?.[0]?.toUpperCase() ?? "?"}
             </AvatarFallback>
           </Avatar>
-          <div>
-            <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-bold">{profileUser.name}</h1>
+              {(profileUser as { isOwner?: boolean }).isOwner && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+                  <Crown className="h-3 w-3" />
+                  Owner
+                </span>
+              )}
               {isOwnProfile && (
-                <Badge variant="secondary" className="text-xs">
-                  You
-                </Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={handleOpenEdit}
+                >
+                  <Pencil className="h-3 w-3" />
+                  Edit Profile
+                </Button>
               )}
             </div>
             <p className="text-sm text-muted-foreground">{profileUser.email}</p>
+            {(profileUser as { bio?: string }).bio && (
+              <p className="text-sm text-muted-foreground mt-1">
+                {(profileUser as { bio?: string }).bio}
+              </p>
+            )}
             {profileUser.createdAt && (
               <p className="text-xs text-muted-foreground mt-0.5">
                 Member since{" "}
@@ -283,6 +349,93 @@ export default function ProfilePage({
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Edit Profile Sheet */}
+      <Sheet open={editOpen} onOpenChange={(o) => !o && setEditOpen(false)}>
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Edit Profile</SheetTitle>
+            <SheetDescription>
+              Update your display name, avatar, and bio.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="space-y-6 pt-6">
+            {/* Avatar preview + URL */}
+            <div className="space-y-3">
+              <div className="flex justify-center">
+                <Avatar className="h-20 w-20">
+                  <AvatarImage src={editAvatar || avatarSrc} />
+                  <AvatarFallback className="text-2xl">
+                    {editName?.[0]?.toUpperCase() ?? "?"}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-avatar">Avatar URL</Label>
+                <Input
+                  id="edit-avatar"
+                  placeholder="https://..."
+                  value={editAvatar}
+                  onChange={(e) => setEditAvatar(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Paste any image URL to update your avatar
+                </p>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Display name */}
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-name">Display Name</Label>
+              <Input
+                id="edit-name"
+                placeholder="Your name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+            </div>
+
+            {/* Bio */}
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-bio">Bio</Label>
+              <Textarea
+                id="edit-bio"
+                placeholder="Tell your crew about yourself..."
+                value={editBio}
+                onChange={(e) => setEditBio(e.target.value)}
+                maxLength={200}
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground text-right">
+                {editBio.length}/200
+              </p>
+            </div>
+
+            <Separator />
+
+            {/* Footer actions */}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setEditOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleSave}
+                disabled={saving}
+              >
+                {saving ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </AppShell>
   );
 }

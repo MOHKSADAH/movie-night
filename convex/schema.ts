@@ -16,6 +16,7 @@ export default defineSchema({
     isAnonymous: v.optional(v.boolean()),
     // App-specific fields
     avatar: v.optional(v.string()),
+    bio: v.optional(v.string()),
     createdAt: v.optional(v.number()),
   }).index("email", ["email"]),
 
@@ -72,4 +73,31 @@ export default defineSchema({
   })
     .index("by_movie", ["movieId"])
     .index("by_night", ["nightId"]),
+
+  collections: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    ownerId: v.id("users"),
+    createdAt: v.number(),
+  }).index("by_owner", ["ownerId"]),
+
+  collection_movies: defineTable({
+    collectionId: v.id("collections"),
+    movieId: v.id("movies"),
+    addedBy: v.id("users"),
+    addedAt: v.number(),
+  })
+    .index("by_collection", ["collectionId"])
+    .index("by_collection_movie", ["collectionId", "movieId"]),
+
+  restaurants: defineTable({
+    name: v.string(),
+    category: v.string(),
+    addedBy: v.id("users"),
+    addedAt: v.number(),
+    address: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    priceRange: v.optional(v.string()),
+    upvotes: v.array(v.id("users")),
+  }).index("by_category", ["category"]),
 });

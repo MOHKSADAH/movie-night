@@ -29,6 +29,7 @@ interface WatchlistCardProps {
   onDownvote: () => void;
   onRemove?: () => void;
   canRemove?: boolean;
+  onClick?: () => void;
 }
 
 export function WatchlistCard({
@@ -43,11 +44,15 @@ export function WatchlistCard({
   onDownvote,
   onRemove,
   canRemove,
+  onClick,
 }: WatchlistCardProps) {
   return (
     <div className="group rounded-lg border border-border bg-card overflow-hidden flex flex-col hover:border-border/80 transition-colors">
       {/* Poster */}
-      <div className="relative aspect-2/3 bg-muted shrink-0">
+      <div
+        className="relative aspect-2/3 bg-muted shrink-0 cursor-pointer"
+        onClick={onClick}
+      >
         {movie.poster && movie.poster !== "/placeholder.jpg" ? (
           <Image
             src={movie.poster}
@@ -146,6 +151,7 @@ interface WatchedGridCardProps {
   myRating?: { score: number; note?: string };
   ratingCount: number;
   onClick: () => void;
+  onDelete?: () => void;
 }
 
 export function WatchedGridCard({
@@ -155,6 +161,7 @@ export function WatchedGridCard({
   myRating,
   ratingCount,
   onClick,
+  onDelete,
 }: WatchedGridCardProps) {
   const date = new Date(watchedAt).toLocaleDateString("en-US", {
     month: "short",
@@ -190,12 +197,23 @@ export function WatchedGridCard({
             </span>
           </div>
         )}
-        {myRating && (
+        {myRating && !onDelete && (
           <div className="absolute top-2 right-2 bg-black/70 rounded px-1.5 py-0.5">
             <span className="text-[10px] font-semibold text-white">
               You: {myRating.score}/10
             </span>
           </div>
+        )}
+        {onDelete && (
+          <button
+            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 hover:bg-destructive/80 rounded p-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5 text-white" />
+          </button>
         )}
       </div>
 

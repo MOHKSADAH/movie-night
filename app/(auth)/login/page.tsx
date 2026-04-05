@@ -12,10 +12,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import Link from "next/link";
-import { Film } from "lucide-react";
+import { ArrowLeft, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { BrandLogo } from "@/components/brand-logo";
 
 function GoogleIcon() {
   return (
@@ -44,25 +44,56 @@ export default function LoginPage() {
   const { signIn } = useAuthActions();
   const router = useRouter();
   const { isAuthenticated, isLoading } = useConvexAuth();
+
+  const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
       router.replace("/");
     }
   }, [isAuthenticated, isLoading, router]);
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
 
-  const handleEmailLogin = async (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim()) return;
     setLoading(true);
     try {
-      await signIn("password", { email, password, flow: "signIn" });
+      await signIn("email-otp", { email: email.trim() });
+      setStep("code");
+      toast.success("Check your email for the 6-digit code");
+    } catch {
+      toast.error("Failed to send code. Check your email address.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCodeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code.trim()) return;
+    setLoading(true);
+    try {
+      await signIn("email-otp", { email: email.trim(), code: code.trim() });
       router.push("/");
     } catch {
-      toast.error("Invalid email or password");
+      toast.error("Invalid or expired code. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setLoading(true);
+    setCode("");
+    try {
+      await signIn("email-otp", { email: email.trim() });
+      toast.success("New code sent");
+    } catch {
+      toast.error("Failed to resend code");
     } finally {
       setLoading(false);
     }
@@ -81,22 +112,23 @@ export default function LoginPage() {
   return (
     <Card className="w-full max-w-sm shadow-lg">
       <CardHeader className="text-center pb-4">
-        <div className="flex justify-center mb-3">
-          <div className="p-3 rounded-full bg-primary/10">
-            <Film className="h-7 w-7 text-primary" />
-          </div>
+        <div className="flex justify-center mb-2">
+          <BrandLogo className="h-16" priority />
         </div>
-        <CardTitle className="text-2xl font-bold tracking-tight">
-          Movie Night
-        </CardTitle>
-        <CardDescription>Sign in to track movies with your crew</CardDescription>
+        <CardTitle className="sr-only">Movie Night</CardTitle>
+        <CardDescription>
+          {step === "email"
+            ? "Sign in to track movies with your crew"
+            : `Enter the 6-digit code sent to ${email}`}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Google button — always visible */}
         <Button
           variant="outline"
           className="w-full gap-2"
           onClick={handleGoogleLogin}
-          disabled={googleLoading}
+          disabled={googleLoading || loading}
         >
           <GoogleIcon />
           {googleLoading ? "Redirecting..." : "Continue with Google"}
@@ -111,46 +143,82 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <form onSubmit={handleEmailLogin} className="space-y-3">
-          <div className="space-y-1">
-            <label className="text-sm font-medium" htmlFor="email">
-              Email
-            </label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium" htmlFor="password">
-              Password
-            </label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-            />
-          </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
-          </Button>
-        </form>
+        {/* Step 1: email input */}
+        {step === "email" && (
+          <form onSubmit={handleEmailSubmit} className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-sm font-medium" htmlFor="email">
+                Email
+              </label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                autoFocus
+              />
+            </div>
+            <Button type="submit" className="w-full gap-2" disabled={loading}>
+              <Mail className="h-4 w-4" />
+              {loading ? "Sending code..." : "Send sign-in code"}
+            </Button>
+          </form>
+        )}
 
-        <p className="text-center text-sm text-muted-foreground">
-          No account yet?{" "}
-          <Link href="/register" className="text-foreground underline underline-offset-4 hover:text-primary">
-            Create one
-          </Link>
-        </p>
+        {/* Step 2: code input */}
+        {step === "code" && (
+          <form onSubmit={handleCodeSubmit} className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-sm font-medium" htmlFor="code">
+                6-digit code
+              </label>
+              <Input
+                id="code"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                placeholder="123456"
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                required
+                autoFocus
+                className="text-center text-lg tracking-widest font-mono"
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={loading || code.length !== 6}
+            >
+              {loading ? "Verifying..." : "Sign in"}
+            </Button>
+            <div className="flex items-center justify-between text-sm">
+              <button
+                type="button"
+                className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => {
+                  setStep("email");
+                  setCode("");
+                }}
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Back
+              </button>
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                onClick={handleResend}
+                disabled={loading}
+              >
+                Resend code
+              </button>
+            </div>
+          </form>
+        )}
       </CardContent>
     </Card>
   );

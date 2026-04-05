@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 import { AppShell } from "@/components/app-shell";
 import { WatchlistCard } from "@/components/movie-card";
+import { MovieDetailDialog } from "@/components/movie-detail-dialog";
 import { TMDBSearch } from "@/components/tmdb-search";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,17 +39,22 @@ function getPageItems(current: number, total: number): (number | "ellipsis")[] {
   return items;
 }
 
+type WatchlistMovie = NonNullable<ReturnType<typeof useQuery<typeof api.watchlist.getWatchlist>>>[number]["movie"];
+
 export default function WatchlistPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortOption>("votes");
   const [page, setPage] = useState(0);
+  const [detailMovie, setDetailMovie] = useState<WatchlistMovie | null>(null);
+  const [detailEntryMovieId, setDetailEntryMovieId] = useState<Id<"movies"> | null>(null);
 
   const user = useQuery(api.users.getCurrentUser);
   const watchlist = useQuery(api.watchlist.getWatchlist);
   const toggleUpvote = useMutation(api.watchlist.toggleUpvote);
   const toggleDownvote = useMutation(api.watchlist.toggleDownvote);
   const removeFromWatchlist = useMutation(api.watchlist.removeFromWatchlist);
+  const addWatchedEntry = useMutation(api.watched.addWatchedEntry);
 
   const handleUpvote = async (entryId: string) => {
     try {
@@ -71,6 +78,21 @@ export default function WatchlistPage() {
       toast.success("Removed from watchlist");
     } catch {
       toast.error("Failed to remove");
+    }
+  };
+
+  const handleMarkWatched = async () => {
+    if (!detailEntryMovieId) return;
+    try {
+      await addWatchedEntry({
+        movieId: detailEntryMovieId,
+        watchedAt: Date.now(),
+      });
+      toast.success("Marked as watched — removed from watchlist");
+      setDetailMovie(null);
+      setDetailEntryMovieId(null);
+    } catch {
+      toast.error("Failed to mark as watched");
     }
   };
 
@@ -184,7 +206,11 @@ export default function WatchlistPage() {
                     onUpvote={() => handleUpvote(entry._id)}
                     onDownvote={() => handleDownvote(entry._id)}
                     onRemove={() => handleRemove(entry._id)}
-                    canRemove={user ? entry.addedBy?._id === user._id : false}
+                    canRemove={user ? (user as { isOwner?: boolean }).isOwner || entry.addedBy?._id === user._id : false}
+                    onClick={() => {
+                      setDetailMovie(entry.movie);
+                      setDetailEntryMovieId(entry.movie._id as Id<"movies">);
+                    }}
                   />
                 ) : null,
               )}
@@ -265,6 +291,16 @@ export default function WatchlistPage() {
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
         mode="watchlist"
+      />
+
+      <MovieDetailDialog
+        movie={detailMovie as Parameters<typeof MovieDetailDialog>[0]["movie"]}
+        open={!!detailMovie}
+        onClose={() => {
+          setDetailMovie(null);
+          setDetailEntryMovieId(null);
+        }}
+        onMarkWatched={handleMarkWatched}
       />
     </AppShell>
   );
