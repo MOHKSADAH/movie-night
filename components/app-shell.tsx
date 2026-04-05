@@ -44,7 +44,10 @@ function LoadingScreen() {
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
           {navItems.map((item) => (
-            <div key={item.href} className="flex items-center gap-3 px-3 py-2.5">
+            <div
+              key={item.href}
+              className="flex items-center gap-3 px-3 py-2.5"
+            >
               <Skeleton className="h-4 w-4 rounded" />
               <Skeleton className="h-4 w-20" />
             </div>
@@ -78,7 +81,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const user = useQuery(api.users.getCurrentUser);
 
   const [isDark, setIsDark] = useState(
-    () => typeof document !== "undefined" && document.documentElement.classList.contains("dark"),
+    () =>
+      typeof document !== "undefined" &&
+      document.documentElement.classList.contains("dark"),
   );
   const toggleTheme = () => {
     const next = !isDark;
@@ -180,7 +185,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               className="h-9 w-9 p-0 text-muted-foreground hover:text-foreground"
               onClick={toggleTheme}
             >
-              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {isDark ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
             </Button>
           </div>
         </div>

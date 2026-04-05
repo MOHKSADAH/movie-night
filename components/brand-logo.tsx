@@ -19,7 +19,10 @@ export function BrandLogo({
       width={240}
       height={72}
       priority={priority}
-      className={cn("h-10 w-auto object-contain dark:invert dark:brightness-110", className)}
+      className={cn(
+        "h-10 w-auto object-contain dark:invert dark:brightness-110",
+        className,
+      )}
     />
   );
 }

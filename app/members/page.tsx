@@ -61,14 +61,16 @@ export default function MembersPage() {
                       "border-0 bg-card/50 backdrop-blur-sm overflow-hidden",
                       "hover:bg-card/80 hover:shadow-lg dark:hover:shadow-primary/10",
                       "transition-all duration-300 hover:scale-105 cursor-pointer",
-                      "group h-full"
+                      "group h-full",
                     )}
                   >
                     <CardContent className="p-6 flex flex-col items-center text-center gap-4">
                       {/* Avatar */}
                       <div className="relative">
                         <Avatar className="h-20 w-20 ring-2 ring-primary/20 group-hover:ring-primary/50 transition-all">
-                          <AvatarImage src={user.avatar ?? user.image ?? undefined} />
+                          <AvatarImage
+                            src={user.avatar ?? user.image ?? undefined}
+                          />
                           <AvatarFallback className="text-lg font-semibold bg-linear-to-br from-primary/20 to-primary/10">
                             {user.name?.[0]?.toUpperCase() ?? "?"}
                           </AvatarFallback>

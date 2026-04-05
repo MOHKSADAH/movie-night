@@ -208,8 +208,10 @@ export default function WatchlistPage() {
                     onRemove={() => handleRemove(entry._id)}
                     canRemove={user ? (user as { isOwner?: boolean }).isOwner || entry.addedBy?._id === user._id : false}
                     onClick={() => {
-                      setDetailMovie(entry.movie);
-                      setDetailEntryMovieId(entry.movie._id as Id<"movies">);
+                      if (entry.movie) {
+                        setDetailMovie(entry.movie);
+                        setDetailEntryMovieId(entry.movie._id as Id<"movies">);
+                      }
                     }}
                   />
                 ) : null,
